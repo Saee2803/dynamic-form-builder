@@ -124,6 +124,7 @@ class FormSummary(BaseModel):
     form_description: Optional[str]
     form_slug: str
     status: str
+    created_by: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -155,3 +156,4 @@ class PublicSubmissionRead(BaseModel):
     form_id: int
     submitted_at: datetime
     submission_data: dict[str, Any]
+    form_snapshot: Optional[dict[str, Any]] = None

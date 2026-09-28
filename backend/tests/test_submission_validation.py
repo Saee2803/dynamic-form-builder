@@ -1,6 +1,11 @@
 import unittest
+from types import SimpleNamespace
 
-from app.services.submissions import SubmissionValidationError, validate_submission_data
+from app.services.submissions import (
+    SubmissionValidationError,
+    resolve_submission_form_snapshot,
+    validate_submission_data,
+)
 
 
 class SubmissionValidationTests(unittest.TestCase):
@@ -18,6 +23,35 @@ class SubmissionValidationTests(unittest.TestCase):
                 {"name": "attachment", "type": "file", "required": True},
             ]
         }
+
+    def test_submission_snapshot_preserves_historical_form_configuration(self):
+        historical_snapshot = {
+            "form_name": "Original title",
+            "form_description": "Original description",
+            "form_config": {"fields": [{"name": "full_name", "label": "Full name"}]},
+        }
+        current_form = SimpleNamespace(
+            form_name="Edited title",
+            form_description="Edited description",
+            form_config={"fields": [{"name": "full_name", "label": "Name"}]},
+        )
+        submission = SimpleNamespace(form_snapshot=historical_snapshot)
+
+        self.assertEqual(resolve_submission_form_snapshot(current_form, submission), historical_snapshot)
+
+    def test_legacy_submission_without_snapshot_uses_current_form(self):
+        current_config = {"fields": [{"name": "full_name", "label": "Name"}]}
+        current_form = SimpleNamespace(
+            form_name="Current title",
+            form_description=None,
+            form_config=current_config,
+        )
+        submission = SimpleNamespace(form_snapshot=None)
+
+        self.assertEqual(
+            resolve_submission_form_snapshot(current_form, submission),
+            {"form_name": "Current title", "form_description": None, "form_config": current_config},
+        )
 
     def test_accepts_configured_values_and_ignores_unsupported_file_field(self):
         result = validate_submission_data(self.config, {

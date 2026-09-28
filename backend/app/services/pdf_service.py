@@ -15,6 +15,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
 
 from app.models.forms import Form, FormSubmission
+from app.services.submissions import resolve_submission_form_snapshot
 
 
 def _font_names() -> tuple[str, str]:
@@ -58,6 +59,8 @@ def _field_name(field: dict[str, Any]) -> str | None:
 
 
 def generate_submission_pdf(form: Form, submission: FormSubmission) -> bytes:
+    snapshot = resolve_submission_form_snapshot(form, submission)
+    form_name = str(snapshot.get("form_name") or form.form_name)
     regular_font, _ = _font_names()
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
@@ -106,11 +109,12 @@ def generate_submission_pdf(form: Form, submission: FormSubmission) -> bytes:
         leftMargin=22 * mm,
         topMargin=22 * mm,
         bottomMargin=20 * mm,
-        title=f"{form.form_name} submission {submission.submission_id}",
+        title=f"{form_name} submission {submission.submission_id}",
     )
-    story = [Paragraph(escape(form.form_name), title_style)]
-    if form.form_description:
-        story.extend([Paragraph(escape(form.form_description).replace("\n", "<br/>"), metadata_style), Spacer(1, 4 * mm)])
+    story = [Paragraph(escape(form_name), title_style)]
+    form_description = snapshot.get("form_description")
+    if form_description:
+        story.extend([Paragraph(escape(str(form_description)).replace("\n", "<br/>"), metadata_style), Spacer(1, 4 * mm)])
 
     submitted_at = submission.submitted_at.strftime("%d %b %Y %H:%M UTC")
     story.extend([
@@ -121,7 +125,7 @@ def generate_submission_pdf(form: Form, submission: FormSubmission) -> bytes:
         Spacer(1, 3 * mm),
     ])
 
-    form_config = form.form_config if isinstance(form.form_config, dict) else {}
+    form_config = snapshot["form_config"]
     fields = form_config.get("fields", [])
     active_fields = [field for field in fields if isinstance(field, dict) and (field.get("active") if "active" in field else field.get("isActive", True))]
     active_fields.sort(key=lambda field: int(field.get("order") or 0))

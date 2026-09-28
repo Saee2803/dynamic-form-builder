@@ -26,6 +26,7 @@ from app.services.pdf_service import generate_submission_pdf
 from app.services.submissions import (
     SubmissionValidationError,
     build_submission_summary,
+    resolve_submission_form_snapshot,
     validate_submission_data,
 )
 
@@ -70,13 +71,18 @@ def _set_form_status(db: Session, form_id: int, new_status: str) -> Form:
 
 
 @router.post("", response_model=FormDetail, status_code=status.HTTP_201_CREATED, summary="Create a form")
-def create_form(payload: FormCreate, db: Session = Depends(get_db)) -> Form:
+def create_form(
+    payload: FormCreate,
+    db: Session = Depends(get_db),
+    created_by: str = Depends(require_admin),
+) -> Form:
     form = Form(
         form_name=payload.form_name,
         form_description=payload.form_description,
         form_slug=_unique_slug(db, payload.form_name),
         form_config=payload.form_config,
         status="DRAFT",
+        created_by=created_by,
     )
     db.add(form)
     try:
@@ -169,7 +175,10 @@ def list_form_submissions(form_id: int, db: Session = Depends(get_db)) -> list[d
             "form_id": submission.form_id,
             "submitted_at": submission.submitted_at,
             "status": submission.status,
-            "summary": build_submission_summary(form.form_config or {}, submission.submission_data or {}),
+            "summary": build_submission_summary(
+                resolve_submission_form_snapshot(form, submission)["form_config"],
+                submission.submission_data or {},
+            ),
         }
         for submission in submissions
     ]
@@ -267,6 +276,11 @@ def submit_public_form(
     submission = FormSubmission(
         form_id=form.form_id,
         submission_data=submission_data,
+        form_snapshot={
+            "form_name": form.form_name,
+            "form_description": form.form_description,
+            "form_config": form.form_config if isinstance(form.form_config, dict) else {},
+        },
         submitted_by=None,
         status="SUBMITTED",
     )
@@ -287,6 +301,7 @@ def submit_public_form(
         "form_id": submission.form_id,
         "submitted_at": submission.submitted_at,
         "submission_data": submission.submission_data,
+        "form_snapshot": submission.form_snapshot,
     }
 
 

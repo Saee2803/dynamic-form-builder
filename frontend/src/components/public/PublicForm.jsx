@@ -38,7 +38,15 @@ function validateFields(fields, values) {
     }
     if (isEmpty(value)) return
 
-    if (validation.minLength !== undefined && textValue.length < Number(validation.minLength)) {
+    if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(textValue)) {
+      nextErrors[key] = 'Enter a valid email address.'
+    } else if (field.type === 'mobile' && (textValue.replace(/\D/g, '').length < 5 || !/^\+?[\d\s().-]+$/.test(textValue))) {
+      nextErrors[key] = 'Enter a valid mobile number.'
+    } else if (field.type === 'date' && (!/^\d{4}-\d{2}-\d{2}$/.test(textValue) || Number.isNaN(Date.parse(`${textValue}T00:00:00Z`)) || new Date(`${textValue}T00:00:00Z`).toISOString().slice(0, 10) !== textValue)) {
+      nextErrors[key] = 'Enter a valid date.'
+    } else if (field.type === 'number' && !Number.isFinite(Number(value))) {
+      nextErrors[key] = 'Enter a valid number.'
+    } else if (validation.minLength !== undefined && textValue.length < Number(validation.minLength)) {
       nextErrors[key] = `Minimum length is ${validation.minLength}.`
     } else if (validation.maxLength !== undefined && textValue.length > Number(validation.maxLength)) {
       nextErrors[key] = `Maximum length is ${validation.maxLength}.`
@@ -46,6 +54,14 @@ function validateFields(fields, values) {
       nextErrors[key] = `Value must be at least ${validation.min}.`
     } else if (field.type === 'number' && validation.max !== undefined && Number(value) > Number(validation.max)) {
       nextErrors[key] = `Value must be at most ${validation.max}.`
+    } else if (field.type === 'radio' || field.type === 'select') {
+      const allowedOptions = (field.options || []).map((option) => String(typeof option === 'object' ? option.value ?? option.label : option))
+      if (typeof value !== 'string' || !allowedOptions.includes(value)) nextErrors[key] = 'Choose a valid option.'
+    } else if (field.type === 'multiselect' || (field.type === 'checkbox' && field.options?.length)) {
+      const allowedOptions = (field.options || []).map((option) => String(typeof option === 'object' ? option.value ?? option.label : option))
+      if (!Array.isArray(value) || value.some((option) => !allowedOptions.includes(String(option)))) nextErrors[key] = 'Choose valid options.'
+    } else if (field.type === 'checkbox' && typeof value !== 'boolean') {
+      nextErrors[key] = 'Enter a valid choice.'
     }
   })
 

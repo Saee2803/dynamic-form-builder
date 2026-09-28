@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import FieldEditor from '../components/forms/FieldEditor'
 import FieldItem from '../components/forms/FieldItem'
 import FieldPalette from '../components/forms/FieldPalette'
+import PublicField from '../components/public/PublicField'
 import { createForm, getForm, updateForm } from '../services/formsApi'
 
 const fieldLabels = {
@@ -42,6 +43,15 @@ function orderedFields(fields) {
   return [...fields].sort((first, second) => first.order - second.order)
 }
 
+function previewValue(field) {
+  const value = field.defaultValue
+  if (field.type === 'multiselect' || (field.type === 'checkbox' && field.options?.length)) {
+    return Array.isArray(value) ? value.map(String) : value ? [String(value)] : []
+  }
+  if (field.type === 'checkbox') return value === true || value === 'true' || value === '1' || value === 'on'
+  return value ?? ''
+}
+
 export default function FormBuilderPage({ formId, onBack }) {
   const [savedFormId, setSavedFormId] = useState(formId)
   const [form, setForm] = useState({ form_name: '', form_description: '', form_config: { fields: [] } })
@@ -50,6 +60,8 @@ export default function FormBuilderPage({ formId, onBack }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saveMessage, setSaveMessage] = useState('')
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewValues, setPreviewValues] = useState({})
 
   useEffect(() => {
     if (!formId) return undefined
@@ -162,6 +174,11 @@ export default function FormBuilderPage({ formId, onBack }) {
     }
   }
 
+  function openPreview() {
+    setPreviewValues(Object.fromEntries(fields.map((field) => [field.id, previewValue(field)])))
+    setPreviewOpen(true)
+  }
+
   if (loading) return <main className="builder-loading"><span className="spinner" /> Loading form</main>
 
   return (
@@ -171,6 +188,7 @@ export default function FormBuilderPage({ formId, onBack }) {
         <div className="builder-topbar-title"><span className="brand-mark">F</span><span>Form builder</span>{savedFormId && <span className="builder-status">DRAFT</span>}</div>
         <div className="builder-save-area">
           {saveMessage && <span className="save-message" role="status">{saveMessage}</span>}
+          <button className="button button-quiet builder-preview-button" type="button" onClick={openPreview}>Preview</button>
           <button className="button button-primary" onClick={handleSave} disabled={saving || !form.form_name.trim()}>
             {saving ? 'Saving…' : 'Save form'}
           </button>
@@ -232,6 +250,28 @@ export default function FormBuilderPage({ formId, onBack }) {
 
         <FieldEditor field={selectedField} onChange={(changes) => selectedField && updateField(selectedField.id, changes)} />
       </div>
+      {previewOpen && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreviewOpen(false) }}>
+          <section className="confirm-dialog builder-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+            <button className="icon-button submission-close" type="button" aria-label="Close preview" onClick={() => setPreviewOpen(false)}>×</button>
+            <p className="eyebrow">Form preview</p>
+            <h2 id="preview-title">{form.form_name || 'Untitled form'}</h2>
+            {form.form_description && <p className="public-description">{form.form_description}</p>}
+            <div className="builder-preview-fields">
+              {fields.map((field) => (
+                <PublicField
+                  key={field.id}
+                  field={field}
+                  fieldId={`preview-${field.id}`}
+                  value={previewValues[field.id]}
+                  onChange={(value) => setPreviewValues((current) => ({ ...current, [field.id]: value }))}
+                />
+              ))}
+            </div>
+            <div className="confirm-actions"><button className="button button-quiet" type="button" onClick={() => setPreviewOpen(false)}>Close preview</button></div>
+          </section>
+        </div>
+      )}
     </main>
   )
 }

@@ -24,3 +24,4 @@ class SubmissionDetail(BaseModel):
     submitted_at: datetime
     status: str
     submission_data: dict[str, Any]
+    form_snapshot: dict[str, Any] | None = None

@@ -29,7 +29,8 @@ function displayValue(field, value) {
 
 export default function SubmissionConfirmation({ form, submission, downloading, error, onDownload, onClose }) {
   const closeButton = useRef(null)
-  const fields = (form.form_config?.fields || [])
+  const formConfig = submission.form_snapshot?.form_config || form.form_config
+  const fields = (formConfig?.fields || [])
     .filter((field) => (field.active ?? field.isActive ?? true) && !['heading', 'paragraph', 'file'].includes(field.type))
   const rows = fields.flatMap((field, index) => {
     const name = fieldName(field, index)

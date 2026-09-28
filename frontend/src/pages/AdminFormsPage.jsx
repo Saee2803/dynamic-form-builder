@@ -17,6 +17,8 @@ export default function AdminFormsPage({ onCreate, onEdit }) {
   const [pendingTransition, setPendingTransition] = useState(null)
   const [transitioningId, setTransitioningId] = useState(null)
   const [success, setSuccess] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   async function loadForms() {
     setLoading(true)
@@ -99,6 +101,14 @@ export default function AdminFormsPage({ onCreate, onEdit }) {
     window.location.assign('/admin/login')
   }
 
+  const filteredForms = forms.filter((form) => {
+    const search = searchTerm.trim().toLowerCase()
+    const matchesSearch = !search || [form.form_name, form.form_description, form.form_slug]
+      .some((value) => String(value || '').toLowerCase().includes(search))
+    const matchesStatus = statusFilter === 'all' || form.status.toUpperCase() === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
   return (
     <main className="admin-shell">
       <header className="topbar">
@@ -135,9 +145,11 @@ export default function AdminFormsPage({ onCreate, onEdit }) {
               <h2>All forms</h2>
               <p>{loading ? 'Loading forms…' : `${forms.length} ${forms.length === 1 ? 'form' : 'forms'}`}</p>
             </div>
-            <button className="button button-quiet" onClick={loadForms} disabled={loading} aria-label="Refresh forms">
-              ↻ <span>Refresh</span>
-            </button>
+            <div className="forms-toolbar-actions">
+              <label className="filter-control"><span>Search</span><input type="search" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Name, description, or slug" /></label>
+              <label className="filter-control"><span>Status</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="DRAFT">Draft</option><option value="PUBLISHED">Published</option><option value="INACTIVE">Inactive</option></select></label>
+              <button className="button button-quiet" onClick={loadForms} disabled={loading} aria-label="Refresh forms">↻ <span>Refresh</span></button>
+            </div>
           </div>
 
           {loading ? (
@@ -149,6 +161,8 @@ export default function AdminFormsPage({ onCreate, onEdit }) {
               <p>Start with a blank form and add the fields you need.</p>
               <button className="button button-primary" onClick={onCreate}>Create your first form</button>
             </div>
+          ) : filteredForms.length === 0 ? (
+            <div className="forms-no-match">No forms match these filters.</div>
           ) : (
             <div className="table-scroll">
               <table className="forms-table">
@@ -156,7 +170,7 @@ export default function AdminFormsPage({ onCreate, onEdit }) {
                   <tr><th>Form name</th><th>Status</th><th>Slug</th><th>Created</th><th><span className="sr-only">Actions</span></th></tr>
                 </thead>
                 <tbody>
-                  {forms.map((form) => (
+                  {filteredForms.map((form) => (
                     (() => {
                       const normalizedStatus = form.status.toUpperCase()
                       const isPublished = normalizedStatus === 'PUBLISHED'

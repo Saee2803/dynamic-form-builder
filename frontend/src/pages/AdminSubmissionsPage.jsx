@@ -32,7 +32,8 @@ function fieldName(field, index) {
 function SubmissionDetailDialog({ form, submission, onClose }) {
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState('')
-  const fields = (form.form_config?.fields || [])
+  const snapshot = submission.form_snapshot
+  const fields = (snapshot?.form_config?.fields || form.form_config?.fields || [])
     .filter((field) => (field.active ?? field.isActive ?? true) && !['heading', 'paragraph', 'file'].includes(field.type))
     .map((field, index) => ({ field, index }))
     .sort((first, second) => (Number(first.field.order) || first.index + 1) - (Number(second.field.order) || second.index + 1))
@@ -76,7 +77,7 @@ function SubmissionDetailDialog({ form, submission, onClose }) {
     <div className="modal-backdrop submission-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section className="confirm-dialog submission-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-submission-title">
         <button className="icon-button submission-close" type="button" aria-label="Close submission details" onClick={onClose}>×</button>
-        <p className="eyebrow">{form.form_name}</p>
+        <p className="eyebrow">{snapshot?.form_name || form.form_name}</p>
         <h2 id="admin-submission-title">Submission #{submission.submission_id}</h2>
         <div className="submission-meta">
           <span>Submitted</span><strong>{formatDate(submission.submitted_at)}</strong>

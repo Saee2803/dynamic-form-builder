@@ -325,3 +325,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+.forms-toolbar-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.forms-toolbar-actions .filter-control input { width: 205px; }
+.forms-toolbar-actions .filter-control select { min-width: 130px; }
+.forms-no-match { padding: 28px; color: var(--muted); font-size: 12px; text-align: center; }
+.builder-save-area .builder-preview-button { border-color: #54756b; color: #e4eee8; }
+.builder-save-area .builder-preview-button:hover:not(:disabled) { border-color: #91aa9e; background: #234b41; }
+.builder-preview-dialog { position: relative; width: min(720px, 100%); max-height: min(90vh, 850px); overflow-y: auto; }
+.builder-preview-fields { display: grid; gap: 18px; margin: 22px 0 0; padding-top: 18px; border-top: 1px solid #e8ede8; }
+.builder-preview-dialog .confirm-actions { padding-top: 20px; }
+
+@media (max-width: 600px) {
+  .forms-toolbar-actions { width: 100%; display: grid; grid-template-columns: 1fr auto; }
+  .forms-toolbar-actions .filter-control:first-child { grid-column: 1 / -1; }
+  .forms-toolbar-actions .filter-control input { width: 100%; }
+}

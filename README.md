@@ -1,311 +1,154 @@
 # Dynamic Form Builder & Public Registration Portal
 
-## Tech Stack
+A React/Vite and FastAPI application for building forms, publishing public registration URLs, validating submissions, generating PDFs, and reviewing submissions in an authenticated admin workspace.
 
-Frontend:
-- React + Vite + Tailwind CSS
+## Stack
 
-Backend:
-- Python + FastAPI
+- Frontend: React, JavaScript, Vite, Tailwind CSS.
+- Backend: Python, FastAPI, Pydantic, SQLAlchemy.
+- Database: MySQL with Alembic migrations.
+- PDF: ReportLab.
+- Admin sessions: PBKDF2-SHA256 password hashes and signed HttpOnly cookies.
 
-Database:
-- MySQL
+## Requirements
 
-## Project Structure
-
-- `frontend/` – React app for the admin UI shell and eventual form experiences.
-- `backend/` – FastAPI application, environment config, and database setup.
-- MySQL 8+
-- `.gitignore` – ignores generated files and environment variables.
-
-## Prerequisites
-
-Before running the project, make sure you have installed:
-
-- Node.js 18+
-- npm
-- Python 3.11+
-- MySQL 8+
-- Git
+- Python 3.11 or later.
+- Node.js 18 or later and npm.
+- MySQL 8 or later.
 
 ## Setup
 
-### 1. Frontend setup
+Create a MySQL database, then configure the backend environment:
 
-```bash
-cd frontend
-npm install
-npm run dev
+```sql
+CREATE DATABASE dynamic_form_builder CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-### 2. Backend setup
+From `backend/`, create the environment and install dependencies:
 
-```bash
-cd backend
+```powershell
 python -m venv .venv
-# Windows PowerShell
 .\.venv\Scripts\Activate.ps1
-# macOS/Linux
-# source .venv/bin/activate
-
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
 
-### 3. Database setup
+Set `DATABASE_URL` and `FRONTEND_URL` in `backend/.env`. Configure `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, and `ADMIN_SECRET_KEY`; generate a password hash with `python -m app.auth` and a signing key with `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Keep `.env` private. Use `ADMIN_COOKIE_SECURE=true` behind HTTPS.
 
-1. Install and start MySQL locally.
-2. Create a MySQL database named `dynamic_form_builder`.
-3. Copy `backend/.env.example` to `backend/.env` and update the values.
-4. Run database initialization/migrations.
+Apply migrations from `backend/`:
 
-Example:
-
-```bash
-cd backend
+```powershell
 python -m alembic upgrade head
 ```
 
-### 4. Environment variables
+This applies forward-only migrations and preserves existing records. Existing submissions receive a null form snapshot and remain readable using the current form configuration; new submissions save their form name, description, and JSON configuration snapshot.
 
-Create `backend/.env` based on the example file with values such as:
+Run FastAPI from `backend/` and Vite from `frontend/` in separate terminals:
 
-```env
-DATABASE_URL=mysql+pymysql://root:your_password@localhost:3306/dynamic_form_builder
-FRONTEND_URL=http://localhost:5173
-BACKEND_HOST=0.0.0.0
-BACKEND_PORT=8000
+```powershell
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-## Running the Application
-
-Start the backend:
+```powershell
+npm install
+npm run dev -- --host 127.0.0.1
 ```
 
-## Phase 2 Scope
+Open `http://127.0.0.1:5173`. Vite proxies `/api` to `http://localhost:8000`. Set `VITE_BACKEND_URL` to change the proxy target or `VITE_API_BASE_URL` to change the frontend API base. FastAPI Swagger UI is at `http://127.0.0.1:8000/docs`; health check: `GET /health`.
 
-The admin workspace supports form creation, listing, editing, deletion, and field configuration. Form field configuration is stored as JSON in the existing `forms.form_config` column. This phase does not include public form rendering, publishing, submissions, or PDF generation.
+## Form Configuration Example
 
-The forms API is available under `/api/forms`:
+Form fields are saved in the `forms.form_config` JSON column. Public forms render the active fields from this configuration.
+
+```json
+{
+  "fields": [
+    {
+      "id": "field_1",
+      "name": "email_address",
+      "label": "Email address",
+      "type": "email",
+      "placeholder": "name@example.com",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "We will use this for registration updates.",
+      "options": [],
+      "validation": { "maxLength": 254 },
+      "order": 1,
+      "active": true
+    },
+    {
+      "id": "field_2",
+      "name": "interests",
+      "label": "Areas of interest",
+      "type": "multiselect",
+      "required": false,
+      "options": [
+        { "label": "Design", "value": "design" },
+        { "label": "Engineering", "value": "engineering" }
+      ],
+      "validation": {},
+      "order": 2,
+      "active": true
+    }
+  ]
+}
+```
+
+Supported types include text, textarea, number, email, mobile, date, radio, select, multiselect, checkbox, heading, paragraph, and file. File inputs currently render but file storage/upload is not implemented; submitted file values are rejected/ignored by the backend.
+
+## Admin and Participant Workflow
+
+Sign in at `/admin/login`. The admin can create and edit forms, reorder/configure fields, preview the form, search/filter the forms list, publish/deactivate, and view submission lists/details and PDFs. Publish a form to enable its unique `/forms/{slug}` public URL. Participants submit the database-backed form and receive a confirmation with submitted values and a PDF download. Submission timestamps are stored by the backend as UTC and displayed in `Asia/Kolkata` in the frontend.
+
+## API Reference
+
+Admin form endpoints require the admin session cookie:
 
 - `POST /api/forms`
 - `GET /api/forms`
 - `GET /api/forms/{form_id}`
 - `PUT /api/forms/{form_id}`
 - `DELETE /api/forms/{form_id}`
+- `POST /api/forms/{form_id}/publish`
+- `POST /api/forms/{form_id}/deactivate`
+- `GET /api/forms/{form_id}/submissions`
+- `GET /api/forms/{form_id}/submissions/{submission_id}`
+- `GET /api/forms/{form_id}/submissions/{submission_id}/pdf`
 
-The Vite development server proxies `/api` to `http://localhost:8000` by default. Set `VITE_BACKEND_URL` in the frontend environment to use a different local backend. For a deployed frontend, set `VITE_API_BASE_URL` to the API base path or URL.
+Public endpoints:
 
-```bash
-cd backend
-# activate virtual environment if needed
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+- `GET /api/public/forms/{slug}`
+- `POST /api/public/forms/{slug}/submit`
+- `GET /api/public/forms/{slug}/submissions/{submission_id}/pdf`
+
+Authentication endpoints are `POST /api/auth/login`, `GET /api/auth/session`, and `POST /api/auth/logout`. Only published forms are available through public form and submission endpoints. FastAPI OpenAPI documentation is available at `/docs` and `/openapi.json`.
+
+## Database Tables
+
+`forms` stores its name, description, unique slug, complete JSON configuration, status, creator, and timestamps. `form_submissions` stores the form reference, JSON submission values, optional submitter, timestamp, status, and nullable JSON `form_snapshot`. The snapshot migration does not delete or rewrite existing submissions.
+
+## Tests
+
+From `backend/`:
+
+```powershell
+python -m compileall -q app tests alembic
+python -m unittest discover -s tests
 ```
 
-Start the frontend:
+From `frontend/`:
 
-```bash
-cd frontend
-npm run dev -- --host 0.0.0.0
+```powershell
+npm run lint
+npm run build
 ```
 
-## Health Check
+## Security Notes
 
-The backend exposes a health check endpoint:
-
-```http
-GET /health
-```
-
-Example response:
-
-```json
-{
-  # Dynamic Form Builder & Public Registration Portal
-
-  A React and FastAPI application for designing forms, publishing public registration pages, collecting validated submissions, generating PDFs, and reviewing submissions in a protected admin workspace.
-
-  ## Features
-
-  - Admin-authenticated form management, publishing, and deactivation.
-  - Config-driven public fields with client- and server-side validation.
-  - Anonymous submissions stored in the existing `form_submissions` table.
-  - Submission confirmation and server-generated PDF downloads.
-  - Admin submission search, status/date filters, details, and PDF download.
-  - MySQL persistence managed with SQLAlchemy and Alembic.
-
-  ## Stack
-
-  - Frontend: React, JavaScript, Vite, Tailwind CSS.
-  - Backend: Python, FastAPI, SQLAlchemy, Pydantic.
-  - Database: MySQL.
-  - PDF: ReportLab.
-  - Admin sessions: PBKDF2-SHA256 password hashes and signed, HttpOnly cookies.
-
-  ## Project Structure
-
-  ```text
-  backend/
-    app/
-      database/       Settings and SQLAlchemy session
-      models/         Forms and submissions
-      routers/        Auth, forms, public forms, health
-      schemas/        Request and response models
-      services/       Submission validation and PDF generation
-    alembic/          Database migrations
-    tests/            Backend unit tests
-  frontend/
-    src/
-      components/     Form builder and public field components
-      pages/          Admin, public form, login, and submissions views
-      services/       Centralized API client
-  ```
-
-  ## Prerequisites
-
-  - Python 3.11 or later.
-  - Node.js 18 or later and npm.
-  - MySQL 8 or later.
-
-  ## Configure the Environment
-
-  Create a local backend environment file. It is ignored by Git:
-
-  ```powershell
-  cd backend
-  Copy-Item .env.example .env
-  ```
-
-  Set `DATABASE_URL` to the existing MySQL database and keep `FRONTEND_URL` aligned with the browser origin used for development. Do not put plaintext passwords in the environment file.
-
-  Generate an admin password hash. The command prompts for the password twice and prints only the PBKDF2 hash:
-
-  ```powershell
-  python -m app.auth
-  ```
-
-  Paste that result into `ADMIN_PASSWORD_HASH`. Set `ADMIN_USERNAME`, then generate a separate random signing key:
-
-  ```powershell
-  python -c "import secrets; print(secrets.token_urlsafe(48))"
-  ```
-
-  Paste the output into `ADMIN_SECRET_KEY`. Use a key of at least 32 characters. Keep `ADMIN_COOKIE_SECURE=false` for local HTTP development; set it to `true` behind HTTPS. The default session lifetime is eight hours and can be changed with `ADMIN_SESSION_TTL_SECONDS`.
-
-  The available settings are listed in [`backend/.env.example`](backend/.env.example). Never commit `backend/.env`, database credentials, password hashes, or signing keys.
-
-  ## Database Setup
-
-  Create the database if it does not already exist:
-
-  ```sql
-  CREATE DATABASE dynamic_form_builder CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-  ```
-
-  Install backend dependencies, inspect the current migration, and apply pending migrations:
-
-  ```powershell
-  cd backend
-  python -m venv .venv
-  .\.venv\Scripts\Activate.ps1
-  python -m pip install -r requirements.txt
-  python -m alembic current
-  python -m alembic upgrade head
-  python -m alembic history
-  ```
-
-  Migrations are forward-only; these commands do not reset data. The application uses the existing `forms` and `form_submissions` tables. Admin authentication is environment-backed and does not add database tables.
-
-  ## Run the Application
-
-  Start FastAPI from `backend/`:
-
-  ```powershell
-  uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-  ```
-
-  In another terminal, start Vite:
-
-  ```powershell
-  cd frontend
-  npm install
-  npm run dev -- --host 127.0.0.1
-  ```
-
-  Open `http://127.0.0.1:5173`. Vite proxies `/api` to `http://localhost:8000` by default. Set `VITE_BACKEND_URL` to change the proxy target, or `VITE_API_BASE_URL` to change the API base path. Keep CORS `FRONTEND_URL` exact when the browser calls FastAPI directly.
-
-  Health check: `GET /health`.
-
-  ## Admin Login and Authorization
-
-  The admin workspace and all `/api/forms` endpoints require a valid admin session. Sign in at `/admin/login`; the session is an expiring HMAC-signed, HttpOnly, SameSite=Strict cookie. Passwords are verified against a PBKDF2-SHA256 hash. Public form, submission, and public PDF endpoints remain public as intended. CORS allows only the configured frontend origin.
-
-  An unauthenticated admin API request returns `401`. If admin settings are missing, login fails closed with `503` and the admin UI explains which environment settings need configuration. No default credentials are provided.
-
-  ## Demo Flow
-
-  1. Sign in, then create or edit a form from the Forms page.
-  2. Configure fields, save, and publish the form.
-  3. Open its public URL and submit valid values.
-  4. Review the confirmation, submitted values, and PDF download.
-  5. Return to Forms, open Submissions, filter or view a submission, and download its PDF.
-  6. Deactivate and republish the form to verify its public availability changes.
-
-  Submissions pages are available at `/admin/forms/{form_id}/submissions`. Forms with no records show “No submissions yet.” Details and PDF access verify form ownership.
-
-  ## API Reference
-
-  FastAPI Swagger UI: `http://127.0.0.1:8000/docs`.
-
-  Admin form endpoints (session required):
-
-  - `GET /api/forms`
-  - `POST /api/forms`
-  - `GET /api/forms/{form_id}`
-  - `PUT /api/forms/{form_id}`
-  - `DELETE /api/forms/{form_id}`
-  - `POST /api/forms/{form_id}/publish`
-  - `POST /api/forms/{form_id}/deactivate`
-  - `GET /api/forms/{form_id}/submissions`
-  - `GET /api/forms/{form_id}/submissions/{submission_id}`
-  - `GET /api/forms/{form_id}/submissions/{submission_id}/pdf`
-
-  Admin authentication:
-
-  - `POST /api/auth/login`
-  - `GET /api/auth/session`
-  - `POST /api/auth/logout`
-
-  Public endpoints:
-
-  - `GET /api/public/forms/{slug}`
-  - `POST /api/public/forms/{slug}/submit`
-  - `GET /api/public/forms/{slug}/submissions/{submission_id}/pdf`
-
-  Unknown forms/submissions and cross-form submission requests return `404`. Invalid submission data returns a client error without creating a row.
-
-  ## Testing
-
-  Backend, from `backend/`:
-
-  ```powershell
-  python -m compileall -q app tests
-  python -m unittest discover -s tests
-  python -m alembic current
-  ```
-
-  Frontend, from `frontend/`:
-
-  ```powershell
-  npm run lint
-  npm run build
-  ```
-
-  ## Security and Limitations
-
-  - Admin credentials and the signing key must be configured locally; there is no default admin account, password reset, multi-user management, or rate limiting.
-  - Stateless signed sessions are valid until expiry; logout clears the browser cookie but cannot revoke a copied token early.
-  - Set secure cookies and HTTPS in production. The development configuration uses HTTP and a non-secure cookie.
-  - File fields render publicly but file storage and uploads are not implemented.
-  - No authentication is required for the intentionally public form and submission flows.
-  - The admin UI is a single-administrator workspace; roles, email notifications, analytics, and advanced reporting are out of scope.
-
+- All `/api/forms` routes require a valid admin session. No default admin credentials are provided.
+- CORS permits only the configured `FRONTEND_URL`.
+- Database access uses SQLAlchemy ORM queries.
+- Form labels, help text, and submitted values are rendered as text; PDF text is escaped before ReportLab paragraph rendering.
+- Public forms and their submissions are intentionally unauthenticated.
+- Configure HTTPS and secure cookies for production. Rate limiting, multi-admin roles, and file storage are not implemented.

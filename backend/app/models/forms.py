@@ -36,6 +36,7 @@ class FormSubmission(Base):
     submission_id = Column(Integer, primary_key=True, index=True)
     form_id = Column(Integer, ForeignKey("forms.form_id", ondelete="CASCADE"), nullable=False, index=True)
     submission_data = Column(JSON, nullable=False, default={})
+    form_snapshot = Column(JSON, nullable=True)
     submitted_by = Column(String(255), nullable=True)
     submitted_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     status = Column(String(50), nullable=False, default="submitted")

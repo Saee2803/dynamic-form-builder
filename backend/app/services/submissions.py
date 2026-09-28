@@ -10,6 +10,17 @@ class SubmissionValidationError(ValueError):
     pass
 
 
+def resolve_submission_form_snapshot(form: Any, submission: Any) -> dict[str, Any]:
+    snapshot = getattr(submission, "form_snapshot", None)
+    if isinstance(snapshot, dict) and isinstance(snapshot.get("form_config"), dict):
+        return snapshot
+    return {
+        "form_name": form.form_name,
+        "form_description": form.form_description,
+        "form_config": form.form_config if isinstance(form.form_config, dict) else {},
+    }
+
+
 VALUE_FIELD_TYPES = {
     "text",
     "textarea",
