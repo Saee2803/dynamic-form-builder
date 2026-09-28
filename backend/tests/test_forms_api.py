@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database.session import Base
+from app.models.forms import FormSubmission
 from app.routers.forms import (
     create_form,
     deactivate_form,
@@ -87,8 +88,12 @@ class FormApiWorkflowTests(unittest.TestCase):
 
         admin_pdf = download_admin_submission_pdf(form_id, submission_id, self.db)
         self.assertTrue(admin_pdf.body.startswith(b"%PDF"))
+        self.assertIn(f"submission-{submission_id}.pdf", admin_pdf.headers["Content-Disposition"])
+        submission_count = self.db.query(FormSubmission).filter_by(form_id=form_id).count()
         public_pdf = download_public_submission_pdf(slug, submission_id, self.db)
         self.assertTrue(public_pdf.body.startswith(b"%PDF"))
+        self.assertIn(f"submission-{submission_id}.pdf", public_pdf.headers["Content-Disposition"])
+        self.assertEqual(self.db.query(FormSubmission).filter_by(form_id=form_id).count(), submission_count)
 
         self.assertEqual(deactivate_form(form_id, self.db)["status"], "INACTIVE")
         with self.assertRaises(HTTPException) as unavailable:

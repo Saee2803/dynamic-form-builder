@@ -155,7 +155,7 @@ export default function PublicField({ field, fieldId, value, error, onChange }) 
 
   return (
     <div className={`public-field${error ? ' public-field-invalid' : ''}`}>
-      {field.type !== 'radio' && !(field.type === 'checkbox' && (!options.length)) && (
+      {field.type !== 'radio' && field.type !== 'checkbox' && (
         <FieldLabel field={field} htmlFor={fieldId} required={required} />
       )}
       {control}

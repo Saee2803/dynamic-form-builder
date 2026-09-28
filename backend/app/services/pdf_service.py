@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from xml.sax.saxutils import escape
@@ -16,6 +17,17 @@ from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
 
 from app.models.forms import Form, FormSubmission
 from app.services.submissions import resolve_submission_form_snapshot
+
+
+_INDIA_TIME_ZONE = timezone(timedelta(hours=5, minutes=30), name="IST")
+
+
+def _format_submission_timestamp(submitted_at: datetime) -> str:
+    if submitted_at.tzinfo is None or submitted_at.utcoffset() is None:
+        submitted_at = submitted_at.replace(tzinfo=timezone.utc)
+    local_time = submitted_at.astimezone(_INDIA_TIME_ZONE)
+    hour = local_time.hour % 12 or 12
+    return f"{local_time.strftime('%b')} {local_time.day}, {local_time.year}, {hour}:{local_time.minute:02d} {local_time:%p}"
 
 
 def _font_names() -> tuple[str, str]:
@@ -116,7 +128,7 @@ def generate_submission_pdf(form: Form, submission: FormSubmission) -> bytes:
     if form_description:
         story.extend([Paragraph(escape(str(form_description)).replace("\n", "<br/>"), metadata_style), Spacer(1, 4 * mm)])
 
-    submitted_at = submission.submitted_at.strftime("%d %b %Y %H:%M UTC")
+    submitted_at = _format_submission_timestamp(submission.submitted_at)
     story.extend([
         Paragraph(f"<b>Submission ID:</b> {submission.submission_id}", metadata_style),
         Paragraph(f"<b>Submitted at:</b> {escape(submitted_at)}", metadata_style),
